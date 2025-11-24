@@ -77,6 +77,16 @@ class PodChaos(BaseChaos):
         ge=0
     )
     
+    # Advanced fields from Chaos Mesh spec
+    scheduler: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Scheduler configuration for recurring chaos experiments"
+    )
+    remote_cluster: Optional[str] = Field(
+        default=None,
+        description="Remote cluster name for multi-cluster chaos scenarios"
+    )
+    
     @model_validator(mode='after')
     def validate_container_kill(self) -> "PodChaos":
         """
@@ -113,6 +123,14 @@ class PodChaos(BaseChaos):
         # Add grace period if specified
         if self.grace_period is not None:
             spec["gracePeriod"] = self.grace_period
+        
+        # Add scheduler if specified (for recurring experiments)
+        if self.scheduler is not None:
+            spec["scheduler"] = self.scheduler
+        
+        # Add remote cluster if specified
+        if self.remote_cluster is not None:
+            spec["remoteCluster"] = self.remote_cluster
         
         return spec
     

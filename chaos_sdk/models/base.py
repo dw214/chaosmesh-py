@@ -11,7 +11,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 from chaos_sdk.config import config
 from chaos_sdk.client import ChaosClient
@@ -31,49 +31,55 @@ class BaseChaos(BaseModel, ABC):
     """
     Abstract base class for all chaos experiments.
     
-    This class implements the Template Method pattern:
-    - Defines common chaos experiment structure (metadata, selector, mode, duration)
-    - Provides lifecycle methods (apply, delete, wait_for_injection)
-    - Delegates action-specific spec building to subclasses via _build_action_spec()
+    Implements Template Method pattern: defines experiment structure and lifecycle,
+    delegates action-specific behavior to subclasses via _build_action_spec().
     
     Attributes:
         name: Experiment name (auto-generated if not provided)
-        namespace: Kubernetes namespace (default: "default")
+        namespace: Kubernetes namespace
         selector: Target pod selection criteria
         mode: Target selection mode
         value: Value for fixed/fixed-percent modes
         duration: Experiment duration (e.g., "30s", "5m")
-    
-    Example:
-        >>> # Subclass implementation
-        >>> class PodChaos(BaseChaos):
-        ...     action: PodChaosAction
-        ...     
-        ...     def _build_action_spec(self) -> dict:
-        ...         return {"action": self.action.value}
     """
     
-    # Common fields for all chaos types
-    name: str = Field(default_factory=lambda: generate_unique_name("chaos"))
+    name: Optional[str] = None
     namespace: str = "default"
     selector: ChaosSelector
     mode: ChaosMode = ChaosMode.ONE
     value: Optional[str] = None
     duration: Optional[str] = None
     
-    # Pydantic configuration
     class Config:
         """Pydantic model configuration."""
         arbitrary_types_allowed = True
-        use_enum_values = False  # Keep enum objects, not string values
+        use_enum_values = False
+    
+    @field_validator('duration')
+    @classmethod
+    def validate_duration_format(cls, v: Optional[str]) -> Optional[str]:
+        """
+        Validate duration format: <number><unit> where unit is s/m/h.
+        
+        Provides early error messages before K8s API call.
+        """
+        if v is None:
+            return v
+        
+        import re
+        if not re.match(r'^\d+[smh]$', v):
+            raise ValueError(
+                f"Invalid duration: '{v}'. Use format like '30s', '5m', '2h'"
+            )
+        return v
     
     @model_validator(mode='after')
     def validate_mode_value(self) -> "BaseChaos":
         """
-        Validate that 'value' is provided when required by mode.
+        Validate that 'value' is provided when required by mode and is valid.
         
         Raises:
-            ValueError: If value is missing for modes that require it
+            ValueError: If value is missing or invalid for the mode
         """
         modes_requiring_value = {
             ChaosMode.FIXED,
@@ -86,6 +92,60 @@ class BaseChaos(BaseModel, ABC):
                 f"Mode '{self.mode.value}' requires 'value' parameter. "
                 f"For example: value='2' for fixed count or value='50' for percentage."
             )
+        
+        # Validate percentage value range for percentage modes
+        percentage_modes = {ChaosMode.FIXED_PERCENT, ChaosMode.RANDOM_MAX_PERCENT}
+        
+        if self.mode in percentage_modes and self.value:
+            try:
+                percentage = float(self.value)
+                if not 0 <= percentage <= 100:
+                    raise ValueError(
+                        f"Invalid value '{self.value}' for mode '{self.mode.value}'. "
+                        f"Percentage must be between 0 and 100."
+                    )
+            except (ValueError, TypeError) as e:
+                if "could not convert" in str(e) or "invalid literal" in str(e):
+                    raise ValueError(
+                        f"Invalid value '{self.value}' for mode '{self.mode.value}'. "
+                        f"Expected a numeric percentage (0-100), e.g., '50' or '25.5'"
+                    )
+                raise
+        
+        # Validate positive integer for FIXED mode
+        if self.mode == ChaosMode.FIXED and self.value:
+            try:
+                count = int(self.value)
+                if count <= 0:
+                    raise ValueError(
+                        f"Invalid value '{self.value}' for mode 'fixed'. "
+                        f"Count must be a positive integer, e.g., '1', '2', '5'"
+                    )
+            except (ValueError, TypeError) as e:
+                if "invalid literal" in str(e):
+                    raise ValueError(
+                        f"Invalid value '{self.value}' for mode 'fixed'. "
+                        f"Expected a positive integer, e.g., '1', '2', '5'"
+                    )
+                raise
+        
+        return self
+    
+    @model_validator(mode='after')
+    def generate_name_if_missing(self) -> "BaseChaos":
+        """
+        Auto-generate experiment name from class name if not provided.
+        
+        Name format: {lowercase_kind}-{timestamp}
+        Example: podchaos-1700820345, networkchaos-1700820346
+        """
+        if self.name is None:
+            # Convert CamelCase class name to lowercase with dash
+            kind = self.__class__.__name__
+            # Convert PodChaos -> podchaos, NetworkChaos -> networkchaos
+            kind_lower = kind.lower()
+            self.name = generate_unique_name(kind_lower)
+            logger.debug(f"Auto-generated experiment name: {self.name}")
         
         return self
     
@@ -106,34 +166,23 @@ class BaseChaos(BaseModel, ABC):
         """
         Build complete Chaos Mesh CRD definition.
         
-        This is the Template Method - it defines the overall structure
-        and calls _build_action_spec() for customization.
-        
-        Returns:
-            Complete CRD as dictionary, ready for Kubernetes API
+        Template Method: defines structure, calls _build_action_spec() for customization.
         """
-        # Get the CRD kind from class name
         kind = self.__class__.__name__
         
-        # Build base spec
         spec = {
             "selector": self.selector.to_crd_dict(),
             "mode": self.mode.value,
         }
         
-        # Add optional value for fixed modes
         if self.value is not None:
             spec["value"] = self.value
         
-        # Add optional duration
         if self.duration is not None:
             spec["duration"] = self.duration
         
-        # Merge action-specific spec from subclass
-        action_spec = self._build_action_spec()
-        spec.update(action_spec)
+        spec.update(self._build_action_spec())
         
-        # Build complete CRD
         crd = {
             "apiVersion": f"{config.api_group}/{config.api_version}",
             "kind": kind,

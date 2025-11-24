@@ -78,7 +78,7 @@ def test_latency_tolerance_with_network_delay(chaos_controller, web_selector):
     """
     # Arrange - inject network delay
     chaos = NetworkChaos.create_delay(
-       selector=web_selector,
+        selector=web_selector,
         latency="200ms",
         jitter="20ms",
         duration="30s",

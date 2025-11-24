@@ -6,7 +6,7 @@ with mutual exclusivity validation between label-based and pod-name-based target
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field, model_validator
 
 from chaos_sdk.exceptions import AmbiguousSelectorError
@@ -52,6 +52,20 @@ class ChaosSelector(BaseModel):
     pods: Dict[str, List[str]] = Field(default_factory=dict)
     field_selectors: Dict[str, str] = Field(default_factory=dict)
     annotation_selectors: Dict[str, str] = Field(default_factory=dict)
+    
+    # Additional selectors for advanced targeting
+    node_selectors: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Node label selectors to filter pods by node"
+    )
+    pod_phase_selectors: List[str] = Field(
+        default_factory=list,
+        description="Pod phase selectors (e.g., ['Running', 'Pending'])"
+    )
+    expression_selectors: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Kubernetes label selector expressions for complex queries"
+    )
     
     @model_validator(mode='after')
     def validate_mutual_exclusivity(self) -> "ChaosSelector":
@@ -150,6 +164,18 @@ class ChaosSelector(BaseModel):
         # Add annotation selectors
         if self.annotation_selectors:
             selector_dict["annotationSelectors"] = self.annotation_selectors
+        
+        # Add node selectors
+        if self.node_selectors:
+            selector_dict["nodeSelectors"] = self.node_selectors
+        
+        # Add pod phase selectors
+        if self.pod_phase_selectors:
+            selector_dict["podPhaseSelectors"] = self.pod_phase_selectors
+        
+        # Add expression selectors
+        if self.expression_selectors:
+            selector_dict["expressionSelectors"] = self.expression_selectors
         
         return selector_dict
     

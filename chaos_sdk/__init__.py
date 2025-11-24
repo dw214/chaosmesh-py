@@ -27,6 +27,7 @@ from chaos_sdk.experiments.network_chaos import (
     NetworkCorruptParams,
     NetworkPartitionParams,
     NetworkBandwidthParams,
+    NetworkReorderParams,
 )
 
 __version__ = "0.1.0"
@@ -56,4 +57,5 @@ __all__ = [
     "NetworkCorruptParams",
     "NetworkPartitionParams",
     "NetworkBandwidthParams",
+    "NetworkReorderParams",
 ]

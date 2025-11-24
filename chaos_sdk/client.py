@@ -33,44 +33,19 @@ class ChaosClient:
     """
     Kubernetes API client for Chaos Mesh custom resources.
     
-    This client handles:
-    - Smart authentication (in-cluster + kubeconfig fallback)
-    - Automatic retry with exponential backoff
-    - HTTP error translation to SDK exceptions
-    - CRUD operations for all Chaos Mesh CRDs
-    
-    Example:
-        >>> client = ChaosClient()
-        >>> body = {
-        ...     "apiVersion": "chaos-mesh.org/v1alpha1",
-        ...     "kind": "PodChaos",
-        ...     "metadata": {"name": "test", "namespace": "default"},
-        ...     "spec": {...}
-        ... }
-        >>> client.create_chaos_resource("PodChaos", "default", body)
+    Handles smart authentication (in-cluster + kubeconfig fallback),
+    automatic retry with exponential backoff, and error translation.
     """
     
     def __init__(self, kubeconfig_path: Optional[str] = None):
         """
-        Initialize Chaos Mesh API client with smart authentication.
+        Initialize client with smart authentication.
         
-        Authentication strategy:
-        1. Try in-cluster config (for pods running inside K8s)
-        2. Fall back to kubeconfig file (for local development)
-        
-        Args:
-            kubeconfig_path: Optional path to kubeconfig file.
-                           If None, uses config.kubeconfig_path or default.
-        
-        Raises:
-            ChaosMeshConnectionError: If neither auth method succeeds
+        Tries in-cluster config first, falls back to kubeconfig.
         """
         self._setup_kubernetes_client(kubeconfig_path)
         self.custom_api = client.CustomObjectsApi()
-        
-        logger.info(
-            f"ChaosClient initialized for {config.api_group}/{config.api_version}"
-        )
+        logger.info(f"ChaosClient initialized for {config.api_group}/{config.api_version}")
     
     def _setup_kubernetes_client(self, kubeconfig_path: Optional[str]) -> None:
         """
@@ -239,7 +214,7 @@ class ChaosClient:
             
         except ApiException as e:
             if e.status == 404:
-                # Resource already deleted - this is not an error
+                # Idempotent delete: already gone is success
                 logger.warning(
                     f"{kind}/{name} not found in namespace {namespace}, "
                     "possibly already deleted"
@@ -298,18 +273,8 @@ class ChaosClient:
     
     @staticmethod
     def _kind_to_plural(kind: str) -> str:
-        """
-        Convert CRD kind to plural form for API calls.
-        
-        Args:
-            kind: Resource kind (e.g., "PodChaos")
-            
-        Returns:
-            Plural form (e.g., "podchaos")
-        """
-        # Chaos Mesh uses lowercase plural without 'es'
-        # PodChaos -> podchaos
-        # NetworkChaos -> networkchaos
+        """Convert CRD kind to plural form for K8s API."""
+        # Chaos Mesh uses simple lowercase (no 'es' suffix)
         return kind.lower()
     
     @staticmethod

@@ -47,15 +47,15 @@ class NetworkDelayParams(BaseModel):
     
     @field_validator('latency', 'jitter')
     @classmethod
-    def validate_duration_format(cls, v: str) -> str:
+    def validate_duration_format(cls, value: str) -> str:
         """Validate latency/jitter format."""
-        return validate_network_param_format(v, "latency/jitter")
+        return validate_network_param_format(value, "latency/jitter")
     
     @field_validator('correlation')
     @classmethod
-    def validate_correlation(cls, v: str) -> str:
+    def validate_correlation(cls, value: str) -> str:
         """Validate correlation is a percentage."""
-        return validate_percentage(v, "correlation")
+        return validate_percentage(value, "correlation")
 
 
 class NetworkLossParams(BaseModel):
@@ -75,9 +75,9 @@ class NetworkLossParams(BaseModel):
     
     @field_validator('loss', 'correlation')
     @classmethod
-    def validate_percentage_field(cls, v: str) -> str:
+    def validate_percentage_field(cls, value: str) -> str:
         """Validate percentage values."""
-        return validate_percentage(v, "percentage")
+        return validate_percentage(value, "percentage")
 
 
 class NetworkDuplicateParams(BaseModel):
@@ -97,9 +97,9 @@ class NetworkDuplicateParams(BaseModel):
     
     @field_validator('duplicate', 'correlation')
     @classmethod
-    def validate_percentage_field(cls, v: str) -> str:
+    def validate_percentage_field(cls, value: str) -> str:
         """Validate percentage values."""
-        return validate_percentage(v, "percentage")
+        return validate_percentage(value, "percentage")
 
 
 class NetworkCorruptParams(BaseModel):
@@ -119,9 +119,9 @@ class NetworkCorruptParams(BaseModel):
     
     @field_validator('corrupt', 'correlation')
     @classmethod
-    def validate_percentage_field(cls, v: str) -> str:
+    def validate_percentage_field(cls, value: str) -> str:
         """Validate percentage values."""
-        return validate_percentage(v, "percentage")
+        return validate_percentage(value, "percentage")
 
 
 class NetworkPartitionParams(BaseModel):
@@ -192,9 +192,9 @@ class NetworkReorderParams(BaseModel):
     
     @field_validator('reorder', 'correlation')
     @classmethod
-    def validate_percentage_field(cls, v: str) -> str:
+    def validate_percentage_field(cls, value: str) -> str:
         """Validate percentage values."""
-        return validate_percentage(v, "percentage")
+        return validate_percentage(value, "percentage")
 
 
 class NetworkChaos(BaseChaos):
@@ -255,6 +255,24 @@ class NetworkChaos(BaseChaos):
     partition: Optional[NetworkPartitionParams] = None
     bandwidth: Optional[NetworkBandwidthParams] = None
     reorder: Optional[NetworkReorderParams] = None
+    
+    # Advanced fields from Chaos Mesh spec
+    direction: Optional[NetworkDirection] = Field(
+        default=None,
+        description="Traffic direction (to/from/both) for non-partition actions"
+    )
+    device: Optional[str] = Field(
+        default=None,
+        description="Network device name (default: eth0)"
+    )
+    external_targets: Optional[list] = Field(
+        default=None,
+        description="List of external targets (IPs or domains) for network chaos"
+    )
+    tc_parameter: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Raw tc command parameters for advanced network control"
+    )
     
     @model_validator(mode='after')
     def validate_action_params(self) -> "NetworkChaos":
@@ -318,6 +336,20 @@ class NetworkChaos(BaseChaos):
             
         elif self.action == NetworkChaosAction.REORDER and self.reorder:
             spec["reorder"] = self.reorder.model_dump(exclude_none=True)
+        
+        # Add advanced fields if specified
+        if self.direction is not None and self.action != NetworkChaosAction.PARTITION:
+            # direction is handled separately for partition action above
+            spec["direction"] = self.direction.value
+        
+        if self.device is not None:
+            spec["device"] = self.device
+        
+        if self.external_targets is not None:
+            spec["externalTargets"] = self.external_targets
+        
+        if self.tc_parameter is not None:
+            spec["tcParameter"] = self.tc_parameter
         
         return spec
     
