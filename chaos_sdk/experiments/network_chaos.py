@@ -20,22 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class NetworkDelayParams(BaseModel):
-    """
-    Parameters for network delay chaos.
-    
-    Attributes:
-        latency: Network latency (e.g., "100ms", "1s")
-        jitter: Latency variation (e.g., "10ms")
-        correlation: Correlation percentage ("0" to "100")
-        reorder: Packet reorder configuration
-    
-    Example:
-        >>> params = NetworkDelayParams(
-        ...     latency="100ms",
-        ...     jitter="10ms",
-        ...     correlation="50"
-        ... )
-    """
+    """Parameters for network delay chaos."""
     
     latency: str = Field(..., description="Network latency (e.g., '100ms', '1s')")
     jitter: str = Field(default="0ms", description="Latency variation")
@@ -48,27 +33,16 @@ class NetworkDelayParams(BaseModel):
     @field_validator('latency', 'jitter')
     @classmethod
     def validate_duration_format(cls, value: str) -> str:
-        """Validate latency/jitter format."""
         return validate_network_param_format(value, "latency/jitter")
     
     @field_validator('correlation')
     @classmethod
     def validate_correlation(cls, value: str) -> str:
-        """Validate correlation is a percentage."""
         return validate_percentage(value, "correlation")
 
 
 class NetworkLossParams(BaseModel):
-    """
-    Parameters for network packet loss chaos.
-    
-    Attributes:
-        loss: Packet loss percentage ("0" to "100")
-        correlation: Correlation percentage ("0" to "100")
-    
-    Example:
-        >>> params = NetworkLossParams(loss="20", correlation="50")
-    """
+    """Parameters for network packet loss chaos."""
     
     loss: str = Field(..., description="Packet loss percentage (0-100)")
     correlation: str = Field(default="0", description="Correlation percentage (0-100)")
@@ -76,21 +50,11 @@ class NetworkLossParams(BaseModel):
     @field_validator('loss', 'correlation')
     @classmethod
     def validate_percentage_field(cls, value: str) -> str:
-        """Validate percentage values."""
         return validate_percentage(value, "percentage")
 
 
 class NetworkDuplicateParams(BaseModel):
-    """
-    Parameters for network packet duplication chaos.
-    
-    Attributes:
-        duplicate: Packet duplication percentage ("0" to "100")
-        correlation: Correlation percentage ("0" to "100")
-    
-    Example:
-        >>> params = NetworkDuplicateParams(duplicate="10", correlation="25")
-    """
+    """Parameters for network packet duplication chaos."""
     
     duplicate: str = Field(..., description="Packet duplication percentage (0-100)")
     correlation: str = Field(default="0", description="Correlation percentage (0-100)")
@@ -98,21 +62,11 @@ class NetworkDuplicateParams(BaseModel):
     @field_validator('duplicate', 'correlation')
     @classmethod
     def validate_percentage_field(cls, value: str) -> str:
-        """Validate percentage values."""
         return validate_percentage(value, "percentage")
 
 
 class NetworkCorruptParams(BaseModel):
-    """
-    Parameters for network packet corruption chaos.
-    
-    Attributes:
-        corrupt: Packet corruption percentage ("0" to "100")
-        correlation: Correlation percentage ("0" to "100")
-    
-    Example:
-        >>> params = NetworkCorruptParams(corrupt="5", correlation="10")
-    """
+    """Parameters for network packet corruption chaos."""
     
     corrupt: str = Field(..., description="Packet corruption percentage (0-100)")
     correlation: str = Field(default="0", description="Correlation percentage (0-100)")
@@ -120,47 +74,18 @@ class NetworkCorruptParams(BaseModel):
     @field_validator('corrupt', 'correlation')
     @classmethod
     def validate_percentage_field(cls, value: str) -> str:
-        """Validate percentage values."""
         return validate_percentage(value, "percentage")
 
 
 class NetworkPartitionParams(BaseModel):
-    """
-    Parameters for network partition chaos.
-    
-    Attributes:
-        direction: Traffic direction to block ("to", "from", "both")
-        target: Target pod selector for partition
-    
-    Example:
-        >>> params = NetworkPartitionParams(
-        ...     direction=NetworkDirection.TO,
-        ...     target=ChaosSelector.from_labels({"app": "database"})
-        ... )
-    """
+    """Parameters for network partition chaos."""
     
     direction: NetworkDirection = Field(..., description="Traffic direction")
     target: ChaosSelector = Field(..., description="Target selector for partition")
 
 
 class NetworkBandwidthParams(BaseModel):
-    """
-    Parameters for network bandwidth limitation chaos.
-    
-    Attributes:
-        rate: Bandwidth rate (e.g., "1mbps", "10kbps")
-        limit: Buffer size limit (e.g., "1000")
-        buffer: Buffer size (e.g., "10000")
-        peakrate: Peak rate (optional)
-        minburst: Minimum burst size (optional)
-    
-    Example:
-        >>> params = NetworkBandwidthParams(
-        ...     rate="1mbps",
-        ...     limit="1000",
-        ...     buffer="10000"
-        ... )
-    """
+    """Parameters for network bandwidth limitation chaos."""
     
     rate: str = Field(..., description="Bandwidth rate (e.g., '1mbps')")
     limit: str = Field(..., description="Buffer limit")
@@ -170,21 +95,7 @@ class NetworkBandwidthParams(BaseModel):
 
 
 class NetworkReorderParams(BaseModel):
-    """
-    Parameters for network packet reordering chaos.
-    
-    Attributes:
-        reorder: Packet reorder percentage ("0" to "100")
-        correlation: Correlation percentage ("0" to "100")
-        gap: Gap for reorder
-    
-    Example:
-        >>> params = NetworkReorderParams(
-        ...     reorder="25",
-        ...     correlation="50",
-        ...     gap="5"
-        ... )
-    """
+    """Parameters for network packet reordering chaos."""
     
     reorder: str = Field(..., description="Packet reorder percentage (0-100)")
     correlation: str = Field(default="0", description="Correlation percentage (0-100)")
@@ -193,7 +104,6 @@ class NetworkReorderParams(BaseModel):
     @field_validator('reorder', 'correlation')
     @classmethod
     def validate_percentage_field(cls, value: str) -> str:
-        """Validate percentage values."""
         return validate_percentage(value, "percentage")
 
 
@@ -201,48 +111,11 @@ class NetworkChaos(BaseChaos):
     """
     Network-level chaos experiment.
     
-    Injects various network faults:
-    - delay: Add network latency
-    - loss: Drop packets
-    - duplicate: Duplicate packets
-    - corrupt: Corrupt packet data
-    - partition: Create network partition
-    - bandwidth: Limit bandwidth
-    - reorder: Reorder packets
+    Supports delay, loss, duplicate, corrupt, partition, bandwidth, and reorder actions.
     
     Attributes:
         action: Type of network chaos to inject
-        delay: Delay parameters (for DELAY action)
-        loss: Loss parameters (for LOSS action)
-        duplicate: Duplicate parameters (for DUPLICATE action)
-        corrupt: Corrupt parameters (for CORRUPT action)
-        partition: Partition parameters (for PARTITION action)
-        bandwidth: Bandwidth parameters (for BANDWIDTH action)
-        reorder: Reorder parameters (for REORDER action)
-    
-    Examples:
-        >>> from chaos_sdk import (
-        ...     NetworkChaos,
-        ...     NetworkChaosAction,
-        ...     ChaosSelector,
-        ...     NetworkDelayParams
-        ... )
-        
-        >>> # Delay chaos using convenience method
-        >>> chaos = NetworkChaos.create_delay(
-        ...     selector=ChaosSelector.from_labels({"app": "web"}),
-        ...     latency="100ms",
-        ...     jitter="10ms",
-        ...     duration="30s"
-        ... )
-        
-        >>> # Loss chaos using direct construction
-        >>> chaos = NetworkChaos(
-        ...     action=NetworkChaosAction.LOSS,
-        ...     loss=NetworkLossParams(loss="20", correlation="50"),
-        ...     selector=ChaosSelector.from_labels({"tier": "frontend"}),
-        ...     duration="1m"
-        ... )
+        delay/loss/duplicate/corrupt/partition/bandwidth/reorder: Action-specific parameters
     """
     
     action: NetworkChaosAction = Field(..., description="Network chaos action type")

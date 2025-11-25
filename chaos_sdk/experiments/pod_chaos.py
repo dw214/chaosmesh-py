@@ -21,49 +21,12 @@ class PodChaos(BaseChaos):
     """
     Pod-level chaos experiment.
     
-    Injects failures at the pod or container level:
-    - pod-failure: Makes pod unavailable for a period
-    - pod-kill: Kills and restarts the pod
-    - container-kill: Kills specific container(s) within the pod
+    Supports pod-failure, pod-kill, and container-kill actions.
     
     Attributes:
         action: Type of pod chaos to inject
-        container_names: List of container names (required for container-kill)
+        container_names: Container names (required for container-kill)
         grace_period: Termination grace period in seconds
-    
-    Examples:
-        >>> from chaos_sdk import PodChaos, PodChaosAction, ChaosSelector, ChaosMode
-        
-        >>> # Pod kill experiment
-        >>> chaos = PodChaos(
-        ...     action=PodChaosAction.POD_KILL,
-        ...     mode=ChaosMode.FIXED,
-        ...     value="2",
-        ...     selector=ChaosSelector.from_labels(
-        ...         labels={"app": "web-server"},
-        ...         namespaces=["production"]
-        ...     ),
-        ...     duration="30s"
-        ... )
-        
-        >>> # Container kill experiment
-        >>> chaos = PodChaos(
-        ...     action=PodChaosAction.CONTAINER_KILL,
-        ...     container_names=["nginx", "sidecar"],
-        ...     selector=ChaosSelector.from_pods(
-        ...         namespace="default",
-        ...         pod_names=["web-7d8b6"]
-        ...     )
-        ... )
-        
-        >>> # Pod failure experiment
-        >>> chaos = PodChaos(
-        ...     action=PodChaosAction.POD_FAILURE,
-        ...     duration="5m",
-        ...     selector=ChaosSelector.from_labels(
-        ...         labels={"tier": "frontend"}
-        ...     )
-        ... )
     """
     
     action: PodChaosAction = Field(..., description="Pod chaos action type")
@@ -77,7 +40,6 @@ class PodChaos(BaseChaos):
         ge=0
     )
     
-    # Advanced fields from Chaos Mesh spec
     scheduler: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Scheduler configuration for recurring chaos experiments"
@@ -89,46 +51,27 @@ class PodChaos(BaseChaos):
     
     @model_validator(mode='after')
     def validate_container_kill(self) -> "PodChaos":
-        """
-        Validate container_names is provided for container-kill action.
-        
-        Raises:
-            ValueError: If container_names is missing for container-kill
-        """
-        if self.action == PodChaosAction.CONTAINER_KILL:
-            if not self.container_names:
-                raise ValueError(
-                    "container_names is required for container-kill action. "
-                    "Specify which containers to kill, e.g.: "
-                    "container_names=['nginx', 'sidecar']"
-                )
-        
+        """Validate container_names is provided for container-kill action."""
+        if self.action == PodChaosAction.CONTAINER_KILL and not self.container_names:
+            raise ValueError(
+                "container-kill requires container_names, e.g.: "
+                "container_names=['nginx', 'sidecar']"
+            )
         return self
     
     def _build_action_spec(self) -> Dict[str, Any]:
-        """
-        Build PodChaos-specific spec fields.
+        """Build PodChaos-specific spec fields."""
+        spec = {"action": self.action.value}
         
-        Returns:
-            Dictionary with action and optional parameters
-        """
-        spec = {
-            "action": self.action.value
-        }
-        
-        # Add container names if specified
         if self.container_names:
             spec["containerNames"] = self.container_names
         
-        # Add grace period if specified
         if self.grace_period is not None:
             spec["gracePeriod"] = self.grace_period
         
-        # Add scheduler if specified (for recurring experiments)
         if self.scheduler is not None:
             spec["scheduler"] = self.scheduler
         
-        # Add remote cluster if specified
         if self.remote_cluster is not None:
             spec["remoteCluster"] = self.remote_cluster
         
