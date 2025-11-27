@@ -6,12 +6,15 @@ including pod-failure, pod-kill, and container-kill actions.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import TYPE_CHECKING, Optional, List, Dict, Any
 
 from pydantic import Field, model_validator
 
 from chaos_sdk.models.base import BaseChaos
 from chaos_sdk.models.enums import PodChaosAction
+
+if TYPE_CHECKING:
+    from chaos_sdk.models.selector import ChaosSelector
 
 logger = logging.getLogger(__name__)
 

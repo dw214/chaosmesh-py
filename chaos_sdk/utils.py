@@ -8,8 +8,11 @@ and orphaned experiment cleanup.
 import logging
 import time
 import re
-from typing import Optional
-from datetime import datetime
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from chaos_sdk.client import ChaosClient
+
 from chaos_sdk.models.enums import CHAOS_KINDS
 
 logger = logging.getLogger(__name__)

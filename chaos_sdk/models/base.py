@@ -10,7 +10,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, model_validator, field_validator
 
 from chaos_sdk.models.selector import ChaosSelector
 from chaos_sdk.models.enums import ChaosMode

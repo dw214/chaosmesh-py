@@ -111,8 +111,9 @@ class ChaosController:
 
         if cleanup_errors:
             logger.warning(
-                f"Cleanup completed with {len(cleanup_errors)} errors:\n"
-                f"{'\n'.join(f'  - {err}' for err in cleanup_errors)}"
+                "Cleanup completed with %d errors:\n%s",
+                len(cleanup_errors),
+                '\n'.join(f'  - {err}' for err in cleanup_errors)
             )
         else:
             logger.info("Cleanup completed successfully")

@@ -7,9 +7,7 @@ separating it from the data models.
 
 import logging
 import time
-from typing import Optional, Dict, Any, List
-
-from kubernetes.client.rest import ApiException
+from typing import Optional, Dict, Any
 
 from chaos_sdk.client import ChaosClient
 from chaos_sdk.config import config
@@ -17,7 +15,6 @@ from chaos_sdk.models.base import BaseChaos
 from chaos_sdk.exceptions import (
     ExperimentTimeoutError,
     ChaosResourceNotFoundError,
-    ExperimentAlreadyExistsError
 )
 
 logger = logging.getLogger(__name__)
