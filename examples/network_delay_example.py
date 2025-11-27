@@ -75,7 +75,7 @@ def main():
         
         print("\n[3/3] Test complete. Removing chaos...")
     
-    print("\n✅ Cleanup complete! Network should be back to normal.")
+    print("\n Cleanup complete! Network should be back to normal.")
     print("\nVerify cleanup with: kubectl get networkchaos -A")
 
 

@@ -21,7 +21,7 @@ class ChaosMode(str, Enum):
         FIXED_PERCENT: Select a fixed percentage of targets (requires 'value' parameter)
         RANDOM_MAX_PERCENT: Select a random percentage up to maximum (requires 'value' parameter)
     """
-    
+
     ONE = "one"
     ALL = "all"
     FIXED = "fixed"
@@ -38,7 +38,7 @@ class PodChaosAction(str, Enum):
         POD_KILL: Kill and restart the pod
         CONTAINER_KILL: Kill specific container(s) in the pod
     """
-    
+
     POD_FAILURE = "pod-failure"
     POD_KILL = "pod-kill"
     CONTAINER_KILL = "container-kill"
@@ -57,7 +57,7 @@ class NetworkChaosAction(str, Enum):
         BANDWIDTH: Limit network bandwidth
         REORDER: Reorder network packets
     """
-    
+
     DELAY = "delay"
     LOSS = "loss"
     DUPLICATE = "duplicate"
@@ -78,7 +78,7 @@ class NetworkDirection(str, Enum):
         FROM: Block traffic FROM target
         BOTH: Block traffic in BOTH directions
     """
-    
+
     TO = "to"
     FROM = "from"
     BOTH = "both"

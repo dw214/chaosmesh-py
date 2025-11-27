@@ -15,13 +15,12 @@ from chaos_sdk.models.selector import ChaosSelector
 from chaos_sdk.models.enums import NetworkChaosAction, NetworkDirection
 from chaos_sdk.utils import validate_network_param_format, validate_percentage
 
-
 logger = logging.getLogger(__name__)
 
 
 class NetworkDelayParams(BaseModel):
     """Parameters for network delay chaos."""
-    
+
     latency: str = Field(..., description="Network latency (e.g., '100ms', '1s')")
     jitter: str = Field(default="0ms", description="Latency variation")
     correlation: str = Field(default="0", description="Correlation percentage (0-100)")
@@ -29,12 +28,12 @@ class NetworkDelayParams(BaseModel):
         default=None,
         description="Packet reorder configuration"
     )
-    
+
     @field_validator('latency', 'jitter')
     @classmethod
     def validate_duration_format(cls, value: str) -> str:
         return validate_network_param_format(value, "latency/jitter")
-    
+
     @field_validator('correlation')
     @classmethod
     def validate_correlation(cls, value: str) -> str:
@@ -43,10 +42,10 @@ class NetworkDelayParams(BaseModel):
 
 class NetworkLossParams(BaseModel):
     """Parameters for network packet loss chaos."""
-    
+
     loss: str = Field(..., description="Packet loss percentage (0-100)")
     correlation: str = Field(default="0", description="Correlation percentage (0-100)")
-    
+
     @field_validator('loss', 'correlation')
     @classmethod
     def validate_percentage_field(cls, value: str) -> str:
@@ -55,10 +54,10 @@ class NetworkLossParams(BaseModel):
 
 class NetworkDuplicateParams(BaseModel):
     """Parameters for network packet duplication chaos."""
-    
+
     duplicate: str = Field(..., description="Packet duplication percentage (0-100)")
     correlation: str = Field(default="0", description="Correlation percentage (0-100)")
-    
+
     @field_validator('duplicate', 'correlation')
     @classmethod
     def validate_percentage_field(cls, value: str) -> str:
@@ -67,10 +66,10 @@ class NetworkDuplicateParams(BaseModel):
 
 class NetworkCorruptParams(BaseModel):
     """Parameters for network packet corruption chaos."""
-    
+
     corrupt: str = Field(..., description="Packet corruption percentage (0-100)")
     correlation: str = Field(default="0", description="Correlation percentage (0-100)")
-    
+
     @field_validator('corrupt', 'correlation')
     @classmethod
     def validate_percentage_field(cls, value: str) -> str:
@@ -79,14 +78,14 @@ class NetworkCorruptParams(BaseModel):
 
 class NetworkPartitionParams(BaseModel):
     """Parameters for network partition chaos."""
-    
+
     direction: NetworkDirection = Field(..., description="Traffic direction")
     target: ChaosSelector = Field(..., description="Target selector for partition")
 
 
 class NetworkBandwidthParams(BaseModel):
     """Parameters for network bandwidth limitation chaos."""
-    
+
     rate: str = Field(..., description="Bandwidth rate (e.g., '1mbps')")
     limit: str = Field(..., description="Buffer limit")
     buffer: str = Field(..., description="Buffer size")
@@ -96,11 +95,11 @@ class NetworkBandwidthParams(BaseModel):
 
 class NetworkReorderParams(BaseModel):
     """Parameters for network packet reordering chaos."""
-    
+
     reorder: str = Field(..., description="Packet reorder percentage (0-100)")
     correlation: str = Field(default="0", description="Correlation percentage (0-100)")
     gap: str = Field(..., description="Gap value for reorder")
-    
+
     @field_validator('reorder', 'correlation')
     @classmethod
     def validate_percentage_field(cls, value: str) -> str:
@@ -117,9 +116,9 @@ class NetworkChaos(BaseChaos):
         action: Type of network chaos to inject
         delay/loss/duplicate/corrupt/partition/bandwidth/reorder: Action-specific parameters
     """
-    
+
     action: NetworkChaosAction = Field(..., description="Network chaos action type")
-    
+
     # Action-specific parameters (only one should be set based on action)
     delay: Optional[NetworkDelayParams] = None
     loss: Optional[NetworkLossParams] = None
@@ -128,7 +127,7 @@ class NetworkChaos(BaseChaos):
     partition: Optional[NetworkPartitionParams] = None
     bandwidth: Optional[NetworkBandwidthParams] = None
     reorder: Optional[NetworkReorderParams] = None
-    
+
     # Advanced fields from Chaos Mesh spec
     direction: Optional[NetworkDirection] = Field(
         default=None,
@@ -146,7 +145,7 @@ class NetworkChaos(BaseChaos):
         default=None,
         description="Raw tc command parameters for advanced network control"
     )
-    
+
     @model_validator(mode='after')
     def validate_action_params(self) -> "NetworkChaos":
         """
@@ -164,18 +163,18 @@ class NetworkChaos(BaseChaos):
             NetworkChaosAction.BANDWIDTH: self.bandwidth,
             NetworkChaosAction.REORDER: self.reorder,
         }
-        
+
         required_param = param_map.get(self.action)
-        
+
         if required_param is None:
             raise ValueError(
                 f"Action '{self.action.value}' requires corresponding parameters. "
                 f"For example, for delay action, provide: "
                 f"delay=NetworkDelayParams(latency='100ms')"
             )
-        
+
         return self
-    
+
     def _build_action_spec(self) -> Dict[str, Any]:
         """
         Build NetworkChaos-specific spec fields.
@@ -186,56 +185,56 @@ class NetworkChaos(BaseChaos):
         spec = {
             "action": self.action.value
         }
-        
+
         # Map action to corresponding spec field
         if self.action == NetworkChaosAction.DELAY and self.delay:
             spec["delay"] = self.delay.model_dump(exclude_none=True)
-            
+
         elif self.action == NetworkChaosAction.LOSS and self.loss:
             spec["loss"] = self.loss.model_dump(exclude_none=True)
-            
+
         elif self.action == NetworkChaosAction.DUPLICATE and self.duplicate:
             spec["duplicate"] = self.duplicate.model_dump(exclude_none=True)
-            
+
         elif self.action == NetworkChaosAction.CORRUPT and self.corrupt:
             spec["corrupt"] = self.corrupt.model_dump(exclude_none=True)
-            
+
         elif self.action == NetworkChaosAction.PARTITION and self.partition:
             spec["direction"] = self.partition.direction.value
             spec["target"] = self.partition.target.to_crd_dict()
-            
+
         elif self.action == NetworkChaosAction.BANDWIDTH and self.bandwidth:
             spec["bandwidth"] = self.bandwidth.model_dump(exclude_none=True)
-            
+
         elif self.action == NetworkChaosAction.REORDER and self.reorder:
             spec["reorder"] = self.reorder.model_dump(exclude_none=True)
-        
+
         # Add advanced fields if specified
         if self.direction is not None and self.action != NetworkChaosAction.PARTITION:
             # direction is handled separately for partition action above
             spec["direction"] = self.direction.value
-        
+
         if self.device is not None:
             spec["device"] = self.device
-        
+
         if self.external_targets is not None:
             spec["externalTargets"] = self.external_targets
-        
+
         if self.tc_parameter is not None:
             spec["tcParameter"] = self.tc_parameter
-        
+
         return spec
-    
+
     # Convenience constructors for common actions
-    
+
     @classmethod
     def create_delay(
-        cls,
-        selector: ChaosSelector,
-        latency: str = "100ms",
-        jitter: str = "10ms",
-        correlation: str = "0",
-        **kwargs
+            cls,
+            selector: ChaosSelector,
+            latency: str = "100ms",
+            jitter: str = "10ms",
+            correlation: str = "0",
+            **kwargs
     ) -> "NetworkChaos":
         """
         Create network delay chaos experiment.
@@ -260,14 +259,14 @@ class NetworkChaos(BaseChaos):
             ),
             **kwargs
         )
-    
+
     @classmethod
     def create_loss(
-        cls,
-        selector: ChaosSelector,
-        loss: str = "20",
-        correlation: str = "0",
-        **kwargs
+            cls,
+            selector: ChaosSelector,
+            loss: str = "20",
+            correlation: str = "0",
+            **kwargs
     ) -> "NetworkChaos":
         """
         Create network packet loss chaos experiment.
@@ -290,14 +289,14 @@ class NetworkChaos(BaseChaos):
             ),
             **kwargs
         )
-    
+
     @classmethod
     def create_partition(
-        cls,
-        selector: ChaosSelector,
-        target: ChaosSelector,
-        direction: NetworkDirection = NetworkDirection.TO,
-        **kwargs
+            cls,
+            selector: ChaosSelector,
+            target: ChaosSelector,
+            direction: NetworkDirection = NetworkDirection.TO,
+            **kwargs
     ) -> "NetworkChaos":
         """
         Create network partition chaos experiment.
@@ -320,15 +319,15 @@ class NetworkChaos(BaseChaos):
             ),
             **kwargs
         )
-    
+
     @classmethod
     def create_bandwidth(
-        cls,
-        selector: ChaosSelector,
-        rate: str = "1mbps",
-        limit: str = "1000",
-        buffer: str = "10000",
-        **kwargs
+            cls,
+            selector: ChaosSelector,
+            rate: str = "1mbps",
+            limit: str = "1000",
+            buffer: str = "10000",
+            **kwargs
     ) -> "NetworkChaos":
         """
         Create network bandwidth limitation chaos experiment.

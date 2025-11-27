@@ -25,7 +25,6 @@ from chaos_sdk.exceptions import (
     ChaosResourceNotFoundError,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +35,7 @@ class ChaosClient:
     Handles smart authentication (in-cluster + kubeconfig fallback),
     automatic retry with exponential backoff, and error translation.
     """
-    
+
     def __init__(self, kubeconfig_path: Optional[str] = None):
         """
         Initialize client with smart authentication.
@@ -45,8 +44,8 @@ class ChaosClient:
         """
         self._setup_kubernetes_client(kubeconfig_path)
         self.custom_api = client.CustomObjectsApi()
-        logger.info(f"ChaosClient initialized for {config.api_group}/{config.api_version}")
-    
+        logger.info("ChaosClient initialized for %s/%s", config.api_group, config.api_version)
+
     def _setup_kubernetes_client(self, kubeconfig_path: Optional[str]) -> None:
         """
         Set up Kubernetes client with smart authentication.
@@ -58,7 +57,7 @@ class ChaosClient:
             ChaosMeshConnectionError: If all auth methods fail
         """
         kube_path = kubeconfig_path or config.kubeconfig_path
-        
+
         # Try in-cluster config first
         try:
             k8s_config.load_incluster_config()
@@ -66,12 +65,13 @@ class ChaosClient:
             return
         except k8s_config.ConfigException:
             logger.debug("In-cluster config not available, trying kubeconfig")
-        
+
         # Fall back to kubeconfig
         try:
             k8s_config.load_kube_config(config_file=kube_path)
             logger.info(
-                f"Loaded kubeconfig from {kube_path or 'default location'}"
+                "Loaded kubeconfig from %s",
+                kube_path or "default location"
             )
             return
         except Exception as e:
@@ -79,12 +79,12 @@ class ChaosClient:
                 f"Failed to load Kubernetes configuration: {e}. "
                 "Ensure you're running inside a cluster or have a valid kubeconfig."
             ) from e
-    
+
     def create_chaos_resource(
-        self,
-        kind: str,
-        namespace: str,
-        body: Dict[str, Any]
+            self,
+            kind: str,
+            namespace: str,
+            body: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Create a Chaos Mesh custom resource.
@@ -102,7 +102,7 @@ class ChaosClient:
             ChaosMeshConnectionError: If API call fails
         """
         plural = self._kind_to_plural(kind)
-        
+
         try:
             response = self.custom_api.create_namespaced_custom_object(
                 group=config.api_group,
@@ -111,12 +111,12 @@ class ChaosClient:
                 plural=plural,
                 body=body,
             )
-            
+
             name = body.get("metadata", {}).get("name", "unknown")
-            logger.info(f"Created {kind}/{name} in namespace {namespace}")
-            
+            logger.info("Created %s/%s in namespace %s", kind, name, namespace)
+
             return response
-            
+
         except ApiException as e:
             if e.status == 409:
                 name = body.get("metadata", {}).get("name", "unknown")
@@ -125,7 +125,7 @@ class ChaosClient:
                 ) from e
             else:
                 self._handle_api_exception(e, f"create {kind}")
-    
+
     @retry(
         stop=stop_after_attempt(lambda: config.retry_max_attempts),
         wait=wait_exponential(
@@ -137,10 +137,10 @@ class ChaosClient:
         before_sleep=before_sleep_log(logger, logging.WARNING),
     )
     def get_chaos_resource(
-        self,
-        kind: str,
-        namespace: str,
-        name: str
+            self,
+            kind: str,
+            namespace: str,
+            name: str
     ) -> Dict[str, Any]:
         """
         Get a Chaos Mesh custom resource with automatic retry.
@@ -161,7 +161,7 @@ class ChaosClient:
             ChaosMeshConnectionError: If API call fails after retries
         """
         plural = self._kind_to_plural(kind)
-        
+
         try:
             response = self.custom_api.get_namespaced_custom_object(
                 group=config.api_group,
@@ -170,9 +170,9 @@ class ChaosClient:
                 plural=plural,
                 name=name,
             )
-            
+
             return response
-            
+
         except ApiException as e:
             if e.status == 404:
                 raise ChaosResourceNotFoundError(
@@ -180,12 +180,12 @@ class ChaosClient:
                 ) from e
             else:
                 self._handle_api_exception(e, f"get {kind}/{name}")
-    
+
     def delete_chaos_resource(
-        self,
-        kind: str,
-        namespace: str,
-        name: str
+            self,
+            kind: str,
+            namespace: str,
+            name: str
     ) -> None:
         """
         Delete a Chaos Mesh custom resource.
@@ -200,7 +200,7 @@ class ChaosClient:
             ChaosMeshConnectionError: If API call fails
         """
         plural = self._kind_to_plural(kind)
-        
+
         try:
             self.custom_api.delete_namespaced_custom_object(
                 group=config.api_group,
@@ -209,19 +209,20 @@ class ChaosClient:
                 plural=plural,
                 name=name,
             )
-            
+
             logger.info(f"Deleted {kind}/{name} from namespace {namespace}")
-            
+
         except ApiException as e:
             if e.status == 404:
                 # Idempotent delete: already gone is success
+
                 logger.warning(
-                    f"{kind}/{name} not found in namespace {namespace}, "
-                    "possibly already deleted"
+                    "%s/%s not found in namespace %s, possibly already deleted",
+                    kind, name, namespace
                 )
             else:
                 self._handle_api_exception(e, f"delete {kind}/{name}")
-    
+
     @retry(
         stop=stop_after_attempt(lambda: config.retry_max_attempts),
         wait=wait_exponential(
@@ -233,10 +234,10 @@ class ChaosClient:
         before_sleep=before_sleep_log(logger, logging.WARNING),
     )
     def list_chaos_resources(
-        self,
-        kind: str,
-        namespace: str,
-        label_selector: str = ""
+            self,
+            kind: str,
+            namespace: str,
+            label_selector: str = ""
     ) -> List[Dict[str, Any]]:
         """
         List Chaos Mesh custom resources with optional label filtering.
@@ -253,7 +254,7 @@ class ChaosClient:
             ChaosMeshConnectionError: If API call fails after retries
         """
         plural = self._kind_to_plural(kind)
-        
+
         try:
             response = self.custom_api.list_namespaced_custom_object(
                 group=config.api_group,
@@ -262,21 +263,21 @@ class ChaosClient:
                 plural=plural,
                 label_selector=label_selector,
             )
-            
+
             items = response.get("items", [])
-            logger.debug(f"Listed {len(items)} {kind} resources in {namespace}")
-            
+            logger.debug("Listed %d %s resources in %s", len(items), kind, namespace)
+
             return items
-            
+
         except ApiException as e:
             self._handle_api_exception(e, f"list {kind}")
-    
+
     @staticmethod
     def _kind_to_plural(kind: str) -> str:
         """Convert CRD kind to plural form for K8s API."""
         # Chaos Mesh uses simple lowercase (no 'es' suffix)
         return kind.lower()
-    
+
     @staticmethod
     def _handle_api_exception(exception: ApiException, operation: str) -> None:
         """

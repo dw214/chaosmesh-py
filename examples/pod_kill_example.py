@@ -10,6 +10,7 @@ import time
 
 from chaos_sdk import (
     ChaosController,
+    ChaosManager,
     PodChaos,
     PodChaosAction,
     ChaosSelector,
@@ -55,19 +56,44 @@ def main():
     print(f"\nCreated chaos experiment: {chaos}")
     print(f"Target selector: {selector}")
     
-    # Use context manager for automatic cleanup
+    # Use context manager for automatic cleanup (Recommended for Tests)
+    print("\n--- Method 1: Automatic Cleanup (ChaosController) ---")
     with ChaosController() as controller:
         print("\n[1/3] Injecting chaos and waiting for injection...")
         controller.inject(chaos, wait=True, timeout=60)
         
         print("\n[2/3] Chaos injected! Pod should be killed now.")
         print("      In a real test, you would verify service resilience here.")
-        print("      Waiting 10 seconds to simulate test execution...")
-        time.sleep(10)
+        print("      Waiting 5 seconds to simulate test execution...")
+        time.sleep(5)
         
         print("\n[3/3] Test complete. Context manager will cleanup automatically.")
     
-    print("\n✅ Cleanup complete! No orphaned experiments left.")
+    print("\n Cleanup complete! No orphaned experiments left.")
+    
+    # Demonstration of Manual Control (ChaosManager)
+    print("\n--- Method 2: Manual Control (ChaosManager) ---")
+    manager = ChaosManager()
+    
+    print("Applying chaos manually...")
+    try:
+        manager.apply(chaos)
+        manager.wait_for_injection(chaos)
+        print("Chaos applied manually.")
+        
+        print("Deleting chaos manually...")
+        manager.delete(chaos)
+        manager.wait_for_deletion(chaos)
+        print("Chaos deleted manually.")
+        
+    except Exception as e:
+        print(f"Manual operation failed: {e}")
+        # Ensure cleanup
+        try:
+            manager.delete(chaos)
+        except:
+            pass
+
     print("\nVerify cleanup with: kubectl get podchaos -A")
 
 

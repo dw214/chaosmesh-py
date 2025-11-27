@@ -8,6 +8,7 @@ synchronous wait mechanisms for integration with automated testing frameworks.
 
 from chaos_sdk.config import ChaosConfig
 from chaos_sdk.controller import ChaosController
+from chaos_sdk.manager import ChaosManager
 from chaos_sdk.exceptions import (
     ChaosMeshSDKError,
     ChaosMeshConnectionError,
@@ -36,6 +37,7 @@ __all__ = [
     "ChaosConfig",
     # Controller
     "ChaosController",
+    "ChaosManager",
     # Exceptions
     "ChaosMeshSDKError",
     "ChaosMeshConnectionError",

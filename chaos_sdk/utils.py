@@ -10,7 +10,7 @@ import time
 import re
 from typing import Optional
 from datetime import datetime
-
+from chaos_sdk.models.enums import CHAOS_KINDS
 
 logger = logging.getLogger(__name__)
 
@@ -58,22 +58,22 @@ def parse_duration(duration: str) -> int:
     """
     pattern = r'^(\d+)(s|m|h)$'
     match = re.match(pattern, duration)
-    
+
     if not match:
         raise ValueError(
             f"Invalid duration format: {duration}. "
             "Expected format: <number><unit> where unit is s/m/h"
         )
-    
+
     value, unit = match.groups()
     value = int(value)
-    
+
     multipliers = {
         's': 1,
         'm': 60,
         'h': 3600,
     }
-    
+
     return value * multipliers[unit]
 
 
@@ -100,14 +100,14 @@ def validate_network_param_format(param: str, param_name: str = "parameter") -> 
         ValueError: Invalid latency format...
     """
     pattern = r'^\d+(?:ms|s|m)$'
-    
+
     if not re.match(pattern, param):
         raise ValueError(
             f"Invalid {param_name} format: {param}. "
             "Expected format: <number><unit> where unit is ms/s/m. "
             "Examples: '100ms', '1s', '5m'"
         )
-    
+
     return param
 
 
@@ -135,15 +135,15 @@ def validate_percentage(value: str, param_name: str = "parameter") -> str:
         raise ValueError(
             f"Invalid {param_name}: {value}. Must be a number between 0 and 100."
         )
-    
+
     return value
 
 
 def cleanup_orphaned_experiments(
-    client: "ChaosClient",  # type: ignore
-    namespace: str = "default",
-    label_selector: Optional[str] = None,
-    dry_run: bool = False
+        client: "ChaosClient",  # type: ignore
+        namespace: str = "default",
+        label_selector: Optional[str] = None,
+        dry_run: bool = False
 ) -> int:
     """
     Find and delete orphaned chaos experiments.
@@ -171,10 +171,9 @@ def cleanup_orphaned_experiments(
         ... )
         >>> print(f"Found {count} orphaned experiments")
     """
-    from chaos_sdk.models.enums import CHAOS_KINDS
-    
+
     cleaned_count = 0
-    
+
     for kind in CHAOS_KINDS:
         try:
             experiments = client.list_chaos_resources(
@@ -182,21 +181,21 @@ def cleanup_orphaned_experiments(
                 namespace=namespace,
                 label_selector=label_selector or ""
             )
-            
+
             for exp in experiments:
                 name = exp.get("metadata", {}).get("name")
                 if not name:
                     continue
-                
+
                 if dry_run:
-                    logger.info(f"[DRY-RUN] Would delete {kind}/{name}")
+                    logger.info("[DRY-RUN] Would delete %s/%s", kind, name)
                 else:
-                    logger.info(f"Deleting orphaned experiment: {kind}/{name}")
+                    logger.info("Deleting orphaned experiment: %s/%s", kind, name)
                     client.delete_chaos_resource(kind, namespace, name)
-                
+
                 cleaned_count += 1
-                
+
         except Exception as e:
-            logger.warning(f"Error cleaning {kind} experiments: {e}")
-    
+            logger.warning("Error cleaning %s experiments: %s", kind, e)
+
     return cleaned_count

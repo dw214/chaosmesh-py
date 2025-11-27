@@ -13,7 +13,6 @@ from pydantic import Field, model_validator
 from chaos_sdk.models.base import BaseChaos
 from chaos_sdk.models.enums import PodChaosAction
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -28,7 +27,7 @@ class PodChaos(BaseChaos):
         container_names: Container names (required for container-kill)
         grace_period: Termination grace period in seconds
     """
-    
+
     action: PodChaosAction = Field(..., description="Pod chaos action type")
     container_names: Optional[List[str]] = Field(
         default=None,
@@ -39,7 +38,7 @@ class PodChaos(BaseChaos):
         description="Termination grace period in seconds",
         ge=0
     )
-    
+
     scheduler: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Scheduler configuration for recurring chaos experiments"
@@ -48,7 +47,7 @@ class PodChaos(BaseChaos):
         default=None,
         description="Remote cluster name for multi-cluster chaos scenarios"
     )
-    
+
     @model_validator(mode='after')
     def validate_container_kill(self) -> "PodChaos":
         """Validate container_names is provided for container-kill action."""
@@ -58,31 +57,31 @@ class PodChaos(BaseChaos):
                 "container_names=['nginx', 'sidecar']"
             )
         return self
-    
+
     def _build_action_spec(self) -> Dict[str, Any]:
         """Build PodChaos-specific spec fields."""
         spec = {"action": self.action.value}
-        
+
         if self.container_names:
             spec["containerNames"] = self.container_names
-        
+
         if self.grace_period is not None:
             spec["gracePeriod"] = self.grace_period
-        
+
         if self.scheduler is not None:
             spec["scheduler"] = self.scheduler
-        
+
         if self.remote_cluster is not None:
             spec["remoteCluster"] = self.remote_cluster
-        
+
         return spec
-    
+
     @classmethod
     def pod_failure(
-        cls,
-        selector: "ChaosSelector",  # type: ignore
-        duration: str = "30s",
-        **kwargs
+            cls,
+            selector: "ChaosSelector",  # type: ignore
+            duration: str = "30s",
+            **kwargs
     ) -> "PodChaos":
         """
         Convenience constructor for pod-failure chaos.
@@ -101,13 +100,13 @@ class PodChaos(BaseChaos):
             duration=duration,
             **kwargs
         )
-    
+
     @classmethod
     def pod_kill(
-        cls,
-        selector: "ChaosSelector",  # type: ignore
-        grace_period: Optional[int] = None,
-        **kwargs
+            cls,
+            selector: "ChaosSelector",  # type: ignore
+            grace_period: Optional[int] = None,
+            **kwargs
     ) -> "PodChaos":
         """
         Convenience constructor for pod-kill chaos.
@@ -126,14 +125,14 @@ class PodChaos(BaseChaos):
             grace_period=grace_period,
             **kwargs
         )
-    
+
     @classmethod
     def container_kill(
-        cls,
-        selector: "ChaosSelector",  # type: ignore
-        container_names: List[str],
-        grace_period: Optional[int] = None,
-        **kwargs
+            cls,
+            selector: "ChaosSelector",  # type: ignore
+            container_names: List[str],
+            grace_period: Optional[int] = None,
+            **kwargs
     ) -> "PodChaos":
         """
         Convenience constructor for container-kill chaos.

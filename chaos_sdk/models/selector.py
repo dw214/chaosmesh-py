@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field, model_validator
 
 from chaos_sdk.exceptions import AmbiguousSelectorError
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -46,13 +45,13 @@ class ChaosSelector(BaseModel):
         ...     pod_names=["nginx-7d8b6", "nginx-9f3a2"]
         ... )
     """
-    
+
     namespaces: List[str] = Field(default_factory=list)
     label_selectors: Dict[str, str] = Field(default_factory=dict)
     pods: Dict[str, List[str]] = Field(default_factory=dict)
     field_selectors: Dict[str, str] = Field(default_factory=dict)
     annotation_selectors: Dict[str, str] = Field(default_factory=dict)
-    
+
     # Additional selectors for advanced targeting
     node_selectors: Dict[str, str] = Field(
         default_factory=dict,
@@ -66,7 +65,7 @@ class ChaosSelector(BaseModel):
         default_factory=list,
         description="Kubernetes label selector expressions for complex queries"
     )
-    
+
     @model_validator(mode='after')
     def validate_mutual_exclusivity(self) -> "ChaosSelector":
         """
@@ -83,22 +82,22 @@ class ChaosSelector(BaseModel):
                 "  - label_selectors for label-based selection, OR\n"
                 "  - pods for pod-name-based selection"
             )
-        
+
         # At least one selection method must be specified
-        if not (self.label_selectors or self.pods or self.field_selectors or 
+        if not (self.label_selectors or self.pods or self.field_selectors or
                 self.annotation_selectors):
             raise AmbiguousSelectorError(
                 "At least one selection method must be specified: "
                 "label_selectors, pods, field_selectors, or annotation_selectors"
             )
-        
+
         return self
-    
+
     @classmethod
     def from_labels(
-        cls,
-        labels: Dict[str, str],
-        namespaces: Optional[List[str]] = None
+            cls,
+            labels: Dict[str, str],
+            namespaces: Optional[List[str]] = None
     ) -> "ChaosSelector":
         """
         Convenience constructor for label-based selection.
@@ -114,12 +113,12 @@ class ChaosSelector(BaseModel):
             namespaces=namespaces or [],
             label_selectors=labels
         )
-    
+
     @classmethod
     def from_pods(
-        cls,
-        namespace: str,
-        pod_names: List[str]
+            cls,
+            namespace: str,
+            pod_names: List[str]
     ) -> "ChaosSelector":
         """
         Convenience constructor for pod-specific selection.
@@ -135,7 +134,7 @@ class ChaosSelector(BaseModel):
             namespaces=[namespace],
             pods={namespace: pod_names}
         )
-    
+
     def to_crd_dict(self) -> Dict:
         """
         Convert selector to Chaos Mesh CRD format.
@@ -144,41 +143,41 @@ class ChaosSelector(BaseModel):
             Dictionary matching Chaos Mesh selector specification
         """
         selector_dict = {}
-        
+
         # Add namespaces if specified
         if self.namespaces:
             selector_dict["namespaces"] = self.namespaces
-        
+
         # Add label selectors (convert to proper format)
         if self.label_selectors:
             selector_dict["labelSelectors"] = self.label_selectors
-        
+
         # Add pod selectors
         if self.pods:
             selector_dict["pods"] = self.pods
-        
+
         # Add field selectors
         if self.field_selectors:
             selector_dict["fieldSelectors"] = self.field_selectors
-        
+
         # Add annotation selectors
         if self.annotation_selectors:
             selector_dict["annotationSelectors"] = self.annotation_selectors
-        
+
         # Add node selectors
         if self.node_selectors:
             selector_dict["nodeSelectors"] = self.node_selectors
-        
+
         # Add pod phase selectors
         if self.pod_phase_selectors:
             selector_dict["podPhaseSelectors"] = self.pod_phase_selectors
-        
+
         # Add expression selectors
         if self.expression_selectors:
             selector_dict["expressionSelectors"] = self.expression_selectors
-        
+
         return selector_dict
-    
+
     def __str__(self) -> str:
         """Human-readable selector description."""
         if self.pods:
