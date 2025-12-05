@@ -80,6 +80,24 @@ class ChaosClient:
                 "Ensure you're running inside a cluster or have a valid kubeconfig."
             ) from e
 
+    def _create_retry_decorator(self):
+        """
+        Create a retry decorator with current config values.
+        
+        This method is called at runtime to ensure the latest config values
+        are used for retry parameters.
+        """
+        return retry(
+            stop=stop_after_attempt(config.retry_max_attempts),
+            wait=wait_exponential(
+                multiplier=config.retry_backoff_multiplier,
+                min=config.retry_min_wait,
+                max=config.retry_max_wait,
+            ),
+            retry=retry_if_exception_type(ApiException),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+        )
+
     def create_chaos_resource(
             self,
             kind: str,
@@ -118,24 +136,16 @@ class ChaosClient:
             return response
 
         except ApiException as e:
+            name = body.get("metadata", {}).get("name", "unknown")
             if e.status == 409:
-                name = body.get("metadata", {}).get("name", "unknown")
                 raise ExperimentAlreadyExistsError(
                     f"{kind}/{name} already exists in namespace {namespace}"
                 ) from e
             else:
-                self._handle_api_exception(e, f"create {kind}")
+                self._handle_api_exception(e, f"create {kind}/{name}")
+                # Explicitly raise to satisfy type checker (unreachable code)
+                raise  # pragma: no cover
 
-    @retry(
-        stop=stop_after_attempt(lambda: config.retry_max_attempts),
-        wait=wait_exponential(
-            multiplier=lambda: config.retry_backoff_multiplier,
-            min=lambda: config.retry_min_wait,
-            max=lambda: config.retry_max_wait,
-        ),
-        retry=retry_if_exception_type(ApiException),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-    )
     def get_chaos_resource(
             self,
             kind: str,
@@ -160,26 +170,35 @@ class ChaosClient:
             ChaosResourceNotFoundError: If resource doesn't exist
             ChaosMeshConnectionError: If API call fails after retries
         """
-        plural = self._kind_to_plural(kind)
-
+        retryer = self._create_retry_decorator()
+        
+        @retryer
+        def _get_impl():
+            plural = self._kind_to_plural(kind)
+            try:
+                response = self.custom_api.get_namespaced_custom_object(
+                    group=config.api_group,
+                    version=config.api_version,
+                    namespace=namespace,
+                    plural=plural,
+                    name=name,
+                )
+                return response
+            except ApiException as e:
+                if e.status == 404:
+                    raise ChaosResourceNotFoundError(
+                        f"{kind}/{name} not found in namespace {namespace}"
+                    ) from e
+                # Re-raise for retry on transient errors
+                raise
+        
         try:
-            response = self.custom_api.get_namespaced_custom_object(
-                group=config.api_group,
-                version=config.api_version,
-                namespace=namespace,
-                plural=plural,
-                name=name,
-            )
-
-            return response
-
+            return _get_impl()
+        except ChaosResourceNotFoundError:
+            raise
         except ApiException as e:
-            if e.status == 404:
-                raise ChaosResourceNotFoundError(
-                    f"{kind}/{name} not found in namespace {namespace}"
-                ) from e
-            else:
-                self._handle_api_exception(e, f"get {kind}/{name}")
+            self._handle_api_exception(e, f"get {kind}/{name}")
+            raise  # pragma: no cover
 
     def delete_chaos_resource(
             self,
@@ -196,7 +215,6 @@ class ChaosClient:
             name: Resource name
             
         Raises:
-            ChaosResourceNotFoundError: If resource doesn't exist
             ChaosMeshConnectionError: If API call fails
         """
         plural = self._kind_to_plural(kind)
@@ -210,12 +228,11 @@ class ChaosClient:
                 name=name,
             )
 
-            logger.info(f"Deleted {kind}/{name} from namespace {namespace}")
+            logger.info("Deleted %s/%s from namespace %s", kind, name, namespace)
 
         except ApiException as e:
             if e.status == 404:
                 # Idempotent delete: already gone is success
-
                 logger.warning(
                     "%s/%s not found in namespace %s, possibly already deleted",
                     kind, name, namespace
@@ -223,16 +240,6 @@ class ChaosClient:
             else:
                 self._handle_api_exception(e, f"delete {kind}/{name}")
 
-    @retry(
-        stop=stop_after_attempt(lambda: config.retry_max_attempts),
-        wait=wait_exponential(
-            multiplier=lambda: config.retry_backoff_multiplier,
-            min=lambda: config.retry_min_wait,
-            max=lambda: config.retry_max_wait,
-        ),
-        retry=retry_if_exception_type(ApiException),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-    )
     def list_chaos_resources(
             self,
             kind: str,
@@ -241,6 +248,8 @@ class ChaosClient:
     ) -> List[Dict[str, Any]]:
         """
         List Chaos Mesh custom resources with optional label filtering.
+        
+        This method includes exponential backoff retry for transient failures.
         
         Args:
             kind: Resource kind
@@ -253,9 +262,11 @@ class ChaosClient:
         Raises:
             ChaosMeshConnectionError: If API call fails after retries
         """
-        plural = self._kind_to_plural(kind)
-
-        try:
+        retryer = self._create_retry_decorator()
+        
+        @retryer
+        def _list_impl():
+            plural = self._kind_to_plural(kind)
             response = self.custom_api.list_namespaced_custom_object(
                 group=config.api_group,
                 version=config.api_version,
@@ -263,14 +274,15 @@ class ChaosClient:
                 plural=plural,
                 label_selector=label_selector,
             )
-
             items = response.get("items", [])
             logger.debug("Listed %d %s resources in %s", len(items), kind, namespace)
-
             return items
-
+        
+        try:
+            return _list_impl()
         except ApiException as e:
             self._handle_api_exception(e, f"list {kind}")
+            return []  # pragma: no cover
 
     @staticmethod
     def _kind_to_plural(kind: str) -> str:

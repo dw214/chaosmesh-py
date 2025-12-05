@@ -16,6 +16,7 @@ from chaos_sdk.exceptions import (
     ChaosResourceNotFoundError,
     AmbiguousSelectorError,
     ExperimentTimeoutError,
+    ValidationError,
 )
 from chaos_sdk.models.selector import ChaosSelector
 from chaos_sdk.models.enums import ChaosMode, PodChaosAction, NetworkChaosAction
@@ -45,6 +46,7 @@ __all__ = [
     "ChaosResourceNotFoundError",
     "AmbiguousSelectorError",
     "ExperimentTimeoutError",
+    "ValidationError",
     # Models
     "ChaosSelector",
     "ChaosMode",

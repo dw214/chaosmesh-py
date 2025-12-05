@@ -46,12 +46,16 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+.ruff_cache/
 
 # Distribution
 *.whl
 
 # Logs
 *.log
+
+# Temporary/generated documentation files
+*.resolved
 
 # Kubeconfig (don't commit credentials)
 kubeconfig

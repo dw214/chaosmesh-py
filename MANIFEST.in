@@ -1,0 +1,12 @@
+include LICENSE
+include pyproject.toml
+recursive-include chaos_sdk *.py
+recursive-include examples *.py
+exclude .gitignore
+recursive-exclude tests *
+recursive-exclude .git *
+recursive-exclude .idea *
+recursive-exclude .venv *
+recursive-exclude __pycache__ *
+recursive-exclude *.pyc *
+recursive-exclude docs *
